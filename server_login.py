@@ -35,6 +35,8 @@ class GPSClient(NetworkClient):
     def __init__(self, server, sock):
         super().__init__(server, sock)
 
+    def _parse_read_buffer(self, msg):
+        return ''
 
 class GPClient(NetworkClient):
     _valid_nickname_regexp = re.compile(r"^[][\-`_^{|}A-Za-z][][\-`_^{|}A-Za-z0-9]{0,50}$")

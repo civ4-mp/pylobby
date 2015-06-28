@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 # Based on code copied or translated from works: miniircd,dwc_network_server_emulator, GsOpenSDK, ALuigi's projects, possibly other sources
 #
 import socket
@@ -289,8 +289,8 @@ class SBQRServer(NetworkServer):
         l = byteencode.uint16(len(msg) + 2)
         msg = l + msg
         # iterate through SBClients and make a message for each
-        logging.info('Sending info about host %s to %d clients', host, len(self.clients))
-        for client in self.clients.values():
+        logging.info('Sending info about host %s to %d clients', host, len(self._clients_by_socket))
+        for client in self._clients_by_socket.values():
             client.write(msg)
 
     def sb_senddel04(self, address):
@@ -305,13 +305,13 @@ class SBQRServer(NetworkServer):
         while True:
             self.select()
             now = time.time()
-            if last_aliveness_check + 10 < now:
-                for client in self.clients.values():
+            if self.last_aliveness_check + 10 < now:
+                for client in self._clients_by_socket.values():
                     client.check_aliveness()
-                last_aliveness_check = now
+                self.last_aliveness_check = now
 
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
 server = SBQRServer()
 try:
     server.run()
