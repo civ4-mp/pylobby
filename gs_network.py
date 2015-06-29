@@ -69,7 +69,7 @@ class NetworkServer(object):
     def __init__(self):
         self._clients_by_socket = {}
         self._server_socket_handlers = {}
-        self._info_interval = 5 * 60
+        self._info_interval = 3 * 60
 
     def register_client(self, sock, client):
         self._clients_by_socket[sock] = client
@@ -119,10 +119,11 @@ class NetworkServer(object):
             now = time.time()
             if now >= last_info + self._info_interval:
                 self.info()
+                last_info = now
 
     def info(self):
-        logging.info('[%] server alive with %d clients total:',
+        logging.info('[%s] server alive with %d clients total:',
                      self.__class__.__name__, len(self._clients_by_socket))
-        cs = collections.Counter([c.__class__.__name__ for c in self._clients_by_socket])
+        cs = collections.Counter([c.__class__.__name__ for c in self._clients_by_socket.values()])
         for classname, count in cs.items():
             logging.info('%s: %d', classname, count)
