@@ -241,6 +241,10 @@ class LoginServer(NetworkServer):
             print('Bind failed for gp (29900 TCP): {}'.format(err))
             raise err
         gp_socket.listen(5)
+        gp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        gp_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 120)
+        gp_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 60)
+        gp_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         self.register_server(gp_socket, GPClient)
 
         gps_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -251,6 +255,10 @@ class LoginServer(NetworkServer):
             print('Bind failed for gps (29901 TCP): {}'.format(err))
             raise err
         gps_socket.listen(5)
+        gps_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 120)
+        gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 60)
+        gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         self.register_server(gps_socket, GPSClient)
 
 
