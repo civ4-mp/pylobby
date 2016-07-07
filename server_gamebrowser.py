@@ -111,14 +111,14 @@ class SBClient(NetworkClient):
         elif packet[2] == '\x03':  #ping response
             self.info("ping ack")
         else:
-            self.info("SB recieved unknown command: %d", ord(packet[2]))
+            self.info("SB recieved unknown command: {}".format(packet[2]))
 
     def _parse_read_buffer(self, read_buffer):
         self._timestamp = time.time()
         self._sent_ping = False
         # We need at least two bytes to identify the packet length
         while len(read_buffer) >= 2:
-            cplen = ord(read_buffer[0]) * 256 + ord(read_buffer[1])
+            cplen = read_buffer[0] * 256 + read_buffer[1]
             if len(read_buffer) >= cplen:
                 packet = read_buffer[:cplen]
                 read_buffer = read_buffer[cplen:]
@@ -133,7 +133,7 @@ class SBClient(NetworkClient):
             self.disconnect('ping timeout')
             return
         if not self._sent_ping and self._timestamp + 80 < now:
-            pingstr = '\x00\x07\x03\x77\x77\x77\x77'
+            pingstr = b'\x00\x07\x03\x77\x77\x77\x77'
             self.write(pingstr)
             self._sent_ping = True
 
@@ -177,9 +177,9 @@ class SBQRServer(NetworkServer):
 
     def qr_forw_to(self, rawdata):
         if rawdata[9:15] == '\xfd\xfc\x1e\x66\x6a\xb2':
-            ip = str(ord(rawdata[3])) + '.' + str(ord(rawdata[4])) + '.' + str(ord(rawdata[5])) + '.'\
-               + str(ord(rawdata[6]))
-            port = ord(rawdata[7]) * 256 + ord(rawdata[8])
+            ip = str(rawdata[3]) + '.' + str(rawdata[4]) + '.' + str(rawdata[5]) + '.'\
+               + str(rawdata[6])
+            port = rawdata[7] * 256 + rawdata[8]
             if (ip, port) in self.hosts:
                 logging.info('forwarding to existing host')
             else:
@@ -252,9 +252,9 @@ class SBQRServer(NetworkServer):
                     self.hosts[address].refresh()
 
     def sb_sendpush02(self, host):
-        msg = '\x02'
+        msg = b'\x02'
         flags = 0
-        flags_buffer = ''
+        flags_buffer = b''
         if len(host.data) != 0:
             flags |= UNSOLICITED_UDP_FLAG
             flags |= HAS_KEYS_FLAG
@@ -293,7 +293,7 @@ class SBQRServer(NetworkServer):
             client.write(msg)
 
     def sb_senddel04(self, address):
-        msg = '\x00\x09\x04'
+        msg = b'\x00\x09\x04'
         msg += byteencode.ipaddr(address[0])
         msg += byteencode.uint16(address[1])
         for key in self.clients:

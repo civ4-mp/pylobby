@@ -17,6 +17,9 @@ class NetworkClient(object):
     def __str__(self):
         return '{}@{}:{}'.format(self.__class__.__name__, self.host, self.port)
 
+    def info(self, msg, *args, **kwargs):
+        logging.info(str(self) + msg, *args, **kwargs)
+
     def write_queue_size(self):
         return len(self._write_buffer)
 

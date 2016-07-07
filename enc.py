@@ -1,7 +1,7 @@
 # Based on code copied or translated from works: GsOpenSDK, ALuigi's projects, dwc_network_server_emulator, possibly other sources
 
 #6 functions related to SB Crypting
-SCHALLCONST = "\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+SCHALLCONST = b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
 
 
 class GOACryptState:
@@ -127,11 +127,11 @@ class GOACryptState:
 
 #0/5
 def SBpreCryptHeader():
-    data = ''
-    data += chr(2 ^ 236)  #number of random bytes to follow xor \xEC
-    data += '\x01'
-    data += '\x01'
-    data += chr(15 ^ 234)  #challenge len(15) xor \xEA
+    data = bytearray()
+    data += bytearray([2 ^ 236])  #number of random bytes to follow xor \xEC
+    data += b'\x01'
+    data += b'\x01'
+    data += bytearray([15 ^ 234])  #challenge len(15) xor \xEA
     data += SCHALLCONST
     return data
 
