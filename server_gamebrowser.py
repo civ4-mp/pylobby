@@ -50,7 +50,6 @@ class SBClient(NetworkClient):
         for key, host in self.server.hosts.items():
             if host.lastheard + 360 < time.time():  #deleting old servers here so we dont need a timer for that
                 del self.server.hosts[key]
-                #print "deleting old gamehost"
             else:
                 flags = 0
                 flags_buffer = ''
@@ -170,11 +169,11 @@ class SBQRServer(NetworkServer):
         self.last_aliveness_check = time.time()
 
     def print_hostlist(self):
-        print("Prining hostlist of server...")
+        logging.info("Prining hostlist of server...")
         for index, (_, host) in enumerate(self.hosts.items()):
-            print('[{}] {}:{} ({}) {}'.format(index, host.ip, host.port, host.sessionid, host.lastheard))
-            print(host.data)
-            print('--------')
+            logging.info('[{}] {}:{} ({}) {}'.format(index, host.ip, host.port, host.sessionid, host.lastheard))
+            logging.info(host.data)
+            logging.info('--------')
 
     def qr_forw_to(self, rawdata):
         if rawdata[9:15] == '\xfd\xfc\x1e\x66\x6a\xb2':
@@ -301,7 +300,7 @@ class SBQRServer(NetworkServer):
             self.clients[key].write(msg)
 
     def run(self):
-        print('Server ready, waiting for connections.')
+        logging.info('Server ready, waiting for connections.')
         while True:
             self.select()
             now = time.time()
@@ -316,4 +315,4 @@ server = SBQRServer()
 try:
     server.run()
 except KeyboardInterrupt:
-    print('Interrupted. Stopping')
+    logging.error('Interrupted. Stopping')
