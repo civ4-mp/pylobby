@@ -31,19 +31,97 @@ from gs_network import NetworkClient, NetworkServer
 import gs_enc2
 
 
-class GPSClient(NetworkClient):
+class GPBaseClient(NetworkClient):
     def __init__(self, server, sock):
         super().__init__(server, sock)
 
-    def _parse_read_buffer(self, msg):
-        return bytearray()
+    def _parse_read_buffer(self, read_buffer):
+        # We assume all packets and with \final\ - but never have that inbetween
+        read_buffer = read_buffer.decode('windows-1253', 'ignore')
+        packets = read_buffer.split('\\final\\')
+        # Put last word (maybe empty) back into the readbuffer as we don't know if it is complete yet.
+        remainder = packets[-1]
+        packets = packets[:-1]
+        # Now the packets array should contain complete packets and the readbuffer any remaining incomplete ones
+        for packet in packets:
+            self._parse_packet(packet)
+        return bytearray(remainder, 'windows-1253', 'ignore')
 
-class GPClient(NetworkClient):
-    _valid_nickname_regexp = re.compile(r"^[][\-`_^{|}A-Za-z][][\-`_^{|}A-Za-z0-9]{0,50}$")
+    def _parse_packet(self, packet):
+        words = packet.split('\\')
+        if len(words) < 3 or words[0] != '':
+            logging.warning('Parsing strange packet: {}', packet)
+        command = words[1]
+        words = words[1:]
+        cooked = [(words[i], words[i + 1]) for i in range(0, len(words) - 1, 2)]
+        data = dict(cooked)
+        logging.debug('Receiving command %s, data: %s', command, data)
+        data['command'] = command # for debug purposes
+        if command in self.handlers:
+            try:
+                self.handlers[command](data)
+            except ex:
+                logging.error('Error handling command: %s, data: %s, error: %s', command, data, ex)
+        else:
+            logging.warning('No handler for command: %s', command)
 
+    # Let's hope that GS doesn't care about order...
+    def rpc(self, **kwargs):
+        logging.debug('sending response: %s', kwargs)
+        msg = bytearray(b'\\')
+        for key, value in kwargs.items():
+            msg += bytes(str(key), 'windows-1253')
+            msg += b'\\'
+            if value is not None:
+                msg += bytes(str(value), 'windows-1253')
+            msg += b'\\'
+        msg += b'final\\'
+        self.write(msg)
+
+    def respond(self, words):
+        logging.debug('sending response: %s', words)
+        msg = bytearray(b'\\')
+        for word in words:
+            msg += bytes(str(word), 'windows-1253')
+            msg += b'\\'
+        msg += b'final\\'
+        self.write(msg)
+
+
+_valid_nickname_regexp = re.compile(r"^[][\-`_^{|}A-Za-z][][\-`_^{|}A-Za-z0-9]{0,50}$")
+
+
+def is_valid_nickname(name):
+    # FIXME: Check if these restrictions are consistent with the already existing users
+    if not (5 < len(uname) < 24):
+        return False
+    if not self._valid_nickname_regexp.match(uname):
+        return False
+    return True
+
+
+class GPSClient(GPBaseClient):
     def __init__(self, server, sock):
         super().__init__(server, sock)
-        self.session = -1
+        self.handlers = {'search': self.handle_search,
+                         'logout': self.handle_logout}
+
+    def handle_search(self, data):
+        try:
+            uname = data.get('uniquenick', '')
+            if not is_valid_nickname(uname):
+                raise KeyError()
+            user = self.server.user_db[uname]
+            self.respond(['bsr', 30000 + int(user.id), 'uniquenick', uname, 'bsrdone', ''])
+        except:
+            # No user, roughly relevant answer to the client that seem to work
+            self.respond(['bsr', '', 'bsrdone', ''])
+
+
+class GPClient(GPBaseClient):
+    def __init__(self, server, sock):
+        super().__init__(server, sock)
+        self.id = -1
         self.handlers = {'login': self.handle_login,
                          'logout': self.handle_logout,
                          'newuser': self.handle_newuser,
@@ -57,13 +135,7 @@ class GPClient(NetworkClient):
         uname = data.get('uniquenick', '')
         logging.info("Player %s attempting to login.", uname)
 
-        # FIXME: Check if these restrictions are consistent with the already existing users
-
-        if not (5 < len(uname) < 24):
-            self.error(260, 'fatal', 'Username invalid!')
-            return
-
-        if not self._valid_nickname_regexp.match(uname):
+        if not is_valid_nickname(uname):
             self.error(260, 'fatal', 'Username invalid!')
             return
 
@@ -77,30 +149,22 @@ class GPClient(NetworkClient):
             self.error(260, 'fatal', 'Incorrect password!')
             return
 
-        # TODO: What does this mean?
-        # 1. The meaning of self.session is following:
-        # if we would need to send other commands about buddysystem (that arent implemented), we would need to send 
-        # this .session value every time
-        # but it seems that in current implementation the stored value is never used
-        
-        # 2. Adding 30000 so that the value has 5+ digits. Thats untested, maybe it will work with 1+ digit okay
-        
-        # 3. In other implementations of this server, this session is a randomly generated number, but i think its less 
-        # resourceconsuming if we just generate session value from userid. That way we dont need to compare if 
-        # randomly generated sessionvalue is unique among other currently connected clients
-        self.session = 30000 + int(user.id)
+        # Adding 30000 so that the value has 5+ digits. Thats untested, maybe it will work with 1+ digit okay
+        self.id = 30000 + int(user.id)
 
         user.lastip   = self.host
         user.lasttime = time.time()
-        user.session  = user.session + 1
+        user.session += 1
+
+        self.server.register_gpclient(self)
 
         self.respond(['lc', 2,
-                      'sesskey', self.session,
+                      'sesskey', self.id,
                       'proof', gs_enc2.PW_Hash_to_Proof(user.password, uname,
                                                         config_login.challenge, data['challenge']),
                       'userid', 2000000 + int(user.id),
                       'profileid', 1000000 + int(user.id),
-                       'uniquenick', uname,
+                      'uniquenick', uname,
                       'lt', '1112223334445556667778__',
                       'id', 1])
 
@@ -131,8 +195,34 @@ class GPClient(NetworkClient):
         # \newuser\\email\qqq@qq\nick\borf-tk\passwordenc\J8DHxh7t\productid\11081\gamename\civ4bts\namespaceid\17\uniquenick\borf-tk\partnerid\0\id\1\final\
         
     def handle_getprofile(self, data):
-        pass
-        # Related to buddy-system
+         profileid = int(data['profileid'])
+         user = self.server.user_db[profileid  - 30000]
+         self.rpc(pi=None, profileid=profileid, sig='xxxxxx', uniquenick=user.name, id=data['id'])
+
+    def handle_addbuddy(self, data):
+        newprofileid = int(data['newprofileid'])
+        if newprofileid == self.id:
+            # doesn't let you adding yourself
+            self.error(0, 'warning', 'Refusing to add yourself as buddy')
+            return
+        self.rpc(bm=100, f=newprofileid, msg="|s|3|ss|chilling")
+
+    def handle_buddymsg(self, data):
+        if data['bm'] != '1':
+            self.debug('Ignoring unknown bm %s', data['bm'])
+            return
+        msg = data['msg']
+        if 256 >= len(msg) > 0:
+            # possibly more type checks needed
+            msg.replace('\\', '?')
+            buddy_id = int(msg['t'])
+            try:
+                self.server.gpclient_by_id(buddy_id).rpc(bm=1, f=self.id, msg=msg)
+            except KeyError:
+                self.error(0, 'warning', 'Buddy is not online.')
+
+        self.error(0, 'warning', 'Invalid buddy message size %d. Needs to be >0, <= 256.', len(msg))
+
 
     def handle_status(self, data):
         if 'logout' in data:
@@ -141,44 +231,8 @@ class GPClient(NetworkClient):
     def handle_logout(self, data):
         self.disconnect('logout')
 
-    def _parse_packet(self, packet):
-        words = packet.split('\\')
-        if len(words) < 3 or words[0] != '':
-            logging.warning('Parsing strange packet: {}', packet)
-        command = words[1]
-        words = words[1:]
-        cooked = [(words[i], words[i + 1]) for i in range(0, len(words) - 1, 2)]
-        data = dict(cooked)
-        logging.debug('Receiving command %s, data: %s', command, data)
-        data['command'] = command # for debug purposes
-        if command in self.handlers:
-            self.handlers[command](data)
-        else:
-            logging.warning('No handler for command: %s', command)
-
-    def _parse_read_buffer(self, read_buffer):
-        # We assume all packets and with \final\ - but never have that inbetween
-        read_buffer = read_buffer.decode('windows-1253', 'ignore')
-        packets = read_buffer.split('\\final\\')
-        # Put last word (maybe empty) back into the readbuffer as we don't know if it is complete yet.
-        remainder = packets[-1]
-        packets = packets[:-1]
-        # Now the packets array should contain complete packets and the readbuffer any remaining incomplete ones
-        for packet in packets:
-            self._parse_packet(packet)
-        return bytearray(remainder, 'windows-1253', 'ignore')
-
-    def respond(self, words):
-        logging.debug('sending response: %s', words)
-        msg = bytearray(b'\\')
-        for word in words:
-            msg += bytes(str(word), 'windows-1253')
-            msg += b'\\'
-        msg += b'final\\'
-        self.write(msg)
-
     def error(self, err, severity, errmsg):
-        self.respond(['error', '', 'err', err, severity, '', 'errmsg', errmsg, 'id', 1])
+        self.respond(['error', '', 'err', err, severit, 'errmsg', errmsg, 'id', 1])
 
 
 # Yes this looks inefficient - but it's clever and never out of date.
@@ -213,9 +267,11 @@ class UserDB:
         self.dbcur.execute("SELECT EXISTS(SELECT name FROM users WHERE name=? LIMIT 1);", (uname, ))
         return self.dbcur.fetchone()[0]
 
-    def __getitem__(self, uname):
+    def __getitem__(self, id_or_name):
+        if isinstance(id_or_name, int):
+            return UserObj(self, id_or_name)
         try:
-            self.dbcur.execute("SELECT id FROM users WHERE name=? LIMIT 1;", (uname, ))
+            self.dbcur.execute("SELECT id FROM users WHERE name=? LIMIT 1;", (id_or_name, ))
             uid = self.dbcur.fetchone()[0]
             return UserObj(self, uid)
         except:
@@ -232,6 +288,7 @@ class LoginServer(NetworkServer):
         super().__init__()
 
         self.user_db = UserDB(config_login.dbpath)
+        self._gpclients_by_id = {}
 
         gp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         gp_socket.setblocking(0)
@@ -260,6 +317,19 @@ class LoginServer(NetworkServer):
         gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 60)
         gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         self.register_server(gps_socket, GPSClient)
+
+    # Called after login by the client iself
+    def register_gpclient(self, client):
+        self._gpclients_by_id[client.id] = client
+
+    # Called by base class
+    def unregister_client(self, sock, client):
+        del self._gpclients_by_id[client.id]
+        super().unregister_client(sock, client)
+
+    def gpclient_by_id(self, id):
+        return self._gpclients_by_id[id]
+
 
 
 #logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.DEBUG)

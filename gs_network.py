@@ -6,6 +6,7 @@ import traceback
 import collections
 import time
 
+
 class NetworkClient(object):
     def __init__(self, server, sock):
         self.server = server
