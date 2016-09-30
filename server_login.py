@@ -184,7 +184,7 @@ class GPClient(GPBaseClient):
     def handle_getprofile(self, data):
         profileid = int(data['profileid'])
         user = self.server.user_db[profileid  - 30000]
-        self.respond(['pi', '', 'profileid', profileid, 'sig', 'xxxxxx', 'uniquenick', user.name, 'id', data['id'])
+        self.respond(['pi', '', 'profileid', profileid, 'sig', 'xxxxxx', 'uniquenick', user.name, 'id', data['id']])
 
     def handle_addbuddy(self, data):
         newprofileid = int(data['newprofileid'])
