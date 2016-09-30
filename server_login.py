@@ -65,19 +65,6 @@ class GPBaseClient(NetworkClient):
         else:
             logging.warning('No handler for command: %s', command)
 
-    # Let's hope that GS doesn't care about order...
-    def rpc(self, **kwargs):
-        logging.debug('sending response: %s', kwargs)
-        msg = bytearray(b'\\')
-        for key, value in kwargs.items():
-            msg += bytes(str(key), 'windows-1253')
-            msg += b'\\'
-            if value is not None:
-                msg += bytes(str(value), 'windows-1253')
-            msg += b'\\'
-        msg += b'final\\'
-        self.write(msg)
-
     def respond(self, words):
         logging.debug('sending response: %s', words)
         msg = bytearray(b'\\')
@@ -195,9 +182,9 @@ class GPClient(GPBaseClient):
         # \newuser\\email\qqq@qq\nick\borf-tk\passwordenc\J8DHxh7t\productid\11081\gamename\civ4bts\namespaceid\17\uniquenick\borf-tk\partnerid\0\id\1\final\
         
     def handle_getprofile(self, data):
-         profileid = int(data['profileid'])
-         user = self.server.user_db[profileid  - 30000]
-         self.rpc(pi=None, profileid=profileid, sig='xxxxxx', uniquenick=user.name, id=data['id'])
+        profileid = int(data['profileid'])
+        user = self.server.user_db[profileid  - 30000]
+        self.respond(['pi', '', 'profileid', profileid, 'sig', 'xxxxxx', 'uniquenick', user.name, 'id', data['id'])
 
     def handle_addbuddy(self, data):
         newprofileid = int(data['newprofileid'])
@@ -205,7 +192,7 @@ class GPClient(GPBaseClient):
             # doesn't let you adding yourself
             self.error(0, 'warning', 'Refusing to add yourself as buddy')
             return
-        self.rpc(bm=100, f=newprofileid, msg="|s|3|ss|chilling")
+        self.respond(['bm', 100, 'f', newprofileid, 'msg', "|s|3|ss|chilling"])
 
     def handle_buddymsg(self, data):
         if data['bm'] != '1':
@@ -217,7 +204,7 @@ class GPClient(GPBaseClient):
             msg.replace('\\', '?')
             buddy_id = int(msg['t'])
             try:
-                self.server.gpclient_by_id(buddy_id).rpc(bm=1, f=self.id, msg=msg)
+                self.server.gpclient_by_id(buddy_id).respond(['bm', 1, 'f', self.id, 'msg', msg])
             except KeyError:
                 self.error(0, 'warning', 'Buddy is not online.')
 
