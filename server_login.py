@@ -25,6 +25,7 @@ import time
 import re
 import sqlite3
 import logging
+import traceback
 
 import config_login
 from gs_network import NetworkClient, NetworkServer
@@ -60,8 +61,9 @@ class GPBaseClient(NetworkClient):
         if command in self.handlers:
             try:
                 self.handlers[command](data)
-            except ex:
+            except Exception as ex:
                 logging.error('Error handling command: %s, data: %s, error: %s', command, data, ex)
+                logging.error('%s', traceback.format_exc())
         else:
             logging.warning('No handler for command: %s', command)
 
@@ -78,11 +80,11 @@ class GPBaseClient(NetworkClient):
 _valid_nickname_regexp = re.compile(r"^[][\-`_^{|}A-Za-z][][\-`_^{|}A-Za-z0-9]{0,50}$")
 
 
-def is_valid_nickname(name):
+def is_valid_nickname(uname):
     # FIXME: Check if these restrictions are consistent with the already existing users
     if not (5 < len(uname) < 24):
         return False
-    if not self._valid_nickname_regexp.match(uname):
+    if not _valid_nickname_regexp.match(uname):
         return False
     return True
 
@@ -104,6 +106,9 @@ class GPSClient(GPBaseClient):
             # No user, roughly relevant answer to the client that seem to work
             self.respond(['bsr', '', 'bsrdone', ''])
 
+    def handle_logout(self, data):
+        self.disconnect('logout')
+
 
 class GPClient(GPBaseClient):
     def __init__(self, server, sock):
@@ -113,7 +118,9 @@ class GPClient(GPBaseClient):
                          'logout': self.handle_logout,
                          'newuser': self.handle_newuser,
                          'getprofile': self.handle_getprofile,
-                         'status': self.handle_status}
+                         'status': self.handle_status,
+                         'addbuddy': self.handle_addbuddy,
+                         'bm': self.handle_buddymsg}
 
         # Initial greeting
         self.respond(['lc', 1, 'challenge', config_login.challenge, 'id', 1])
@@ -192,23 +199,22 @@ class GPClient(GPBaseClient):
             # doesn't let you adding yourself
             self.error(0, 'warning', 'Refusing to add yourself as buddy')
             return
-        self.respond(['bm', 100, 'f', newprofileid, 'msg', "|s|3|ss|chilling"])
+        self.respond(['bm', 100, 'f', newprofileid, 'msg', "|s|1|ss|chilling"])
 
     def handle_buddymsg(self, data):
         if data['bm'] != '1':
             self.debug('Ignoring unknown bm %s', data['bm'])
             return
         msg = data['msg']
-        if 256 >= len(msg) > 0:
+        if not (256 >= len(msg) > 0):
+            self.error(0, 'warning', 'Invalid buddy message size {}. Needs to be >0, <= 256.'.format(len(msg)))
             # possibly more type checks needed
-            msg.replace('\\', '?')
-            buddy_id = int(msg['t'])
-            try:
-                self.server.gpclient_by_id(buddy_id).respond(['bm', 1, 'f', self.id, 'msg', msg])
-            except KeyError:
-                self.error(0, 'warning', 'Buddy is not online.')
-
-        self.error(0, 'warning', 'Invalid buddy message size %d. Needs to be >0, <= 256.', len(msg))
+        msg.replace('\\', '?')
+        buddy_id = int(data['t'])
+        try:
+            self.server.gpclient_by_id(buddy_id).respond(['bm', 1, 'f', self.id, 'msg', msg])
+        except KeyError:
+            self.error(0, 'warning', 'Buddy is not online.')
 
 
     def handle_status(self, data):
@@ -219,7 +225,7 @@ class GPClient(GPBaseClient):
         self.disconnect('logout')
 
     def error(self, err, severity, errmsg):
-        self.respond(['error', '', 'err', err, severit, 'errmsg', errmsg, 'id', 1])
+        self.respond(['error', '', 'err', err, severity, 'errmsg', errmsg, 'id', 1])
 
 
 # Yes this looks inefficient - but it's clever and never out of date.
@@ -311,7 +317,11 @@ class LoginServer(NetworkServer):
 
     # Called by base class
     def unregister_client(self, sock, client):
-        del self._gpclients_by_id[client.id]
+        try:
+            if isinstance(client, GPClient): 
+                del self._gpclients_by_id[client.id]
+        except KeyError:
+            pass
         super().unregister_client(sock, client)
 
     def gpclient_by_id(self, id):
@@ -319,8 +329,8 @@ class LoginServer(NetworkServer):
 
 
 
-#logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.DEBUG)
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.DEBUG)
+#logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
 server = LoginServer()
 try:
     server.run()

@@ -34,7 +34,7 @@ class NetworkClient(object):
                 self._read_buffer = self._parse_read_buffer(self._read_buffer)
             except Exception as err:
                 logging.error('[%s] Exception during parse_read_buffer: %s', self, err)
-                logging.debug('%s', traceback.format_exc())
+                logging.error('%s', traceback.format_exc())
                 # Reset buffer to avoid another exception
                 # Maybe we should disconnect here?
                 self._read_buffer = bytearray()
