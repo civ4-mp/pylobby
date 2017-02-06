@@ -46,7 +46,7 @@ class NetworkClient(object):
                 self.disconnect(err)
 
     def socket_writable_notification(self):
-        logging.debug('flusing write buffer (%d bytes) of client %s', len(self._write_buffer), self)
+        logging.debug('flushing write buffer (%d bytes) of client %s', len(self._write_buffer), self)
         if not self._write_buffer:
             return
         try:
