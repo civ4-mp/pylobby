@@ -312,7 +312,7 @@ class SBQRServer(NetworkServer):
                 self.last_aliveness_check = now
 
 
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
 server = SBQRServer()
 try:
     server.run()
