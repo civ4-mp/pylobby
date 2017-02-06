@@ -70,6 +70,8 @@ class SBClient(NetworkClient):
                 for key1, value1 in host.data.items():
                     if key1.startswith('localip') == True:
                         lips.append(value1)
+                if not lips:
+                    lips.append('127.0.0.1')
                 for x1 in lips[random.randrange(0, len(lips))].split('.'):  #value.data['localip0'].split('.'):
                     flags_buffer += chr(int(x1))
                 flags_buffer += byteencode.uint16(host.data.get('localport', 6500))
