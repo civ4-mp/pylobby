@@ -173,7 +173,7 @@ class GPClient(GPBaseClient):
             self.error(0, 'fatal', 'Error creating account, check length!')
             return
 
-        if not self._valid_nickname_regexp.match(data['nick']):
+        if not is_valid_nickname(data['nick']):
             self.error(0, 'fatal', 'Error creating account, invalid name!')
             return
 
@@ -329,8 +329,8 @@ class LoginServer(NetworkServer):
 
 
 
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.DEBUG)
-#logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
+#logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
 server = LoginServer()
 try:
     server.run()
