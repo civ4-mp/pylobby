@@ -7,13 +7,13 @@ from .user_db import UserDB
 
 
 class LoginServer(NetworkServer[LoginBaseClient]):
-    _user_db: UserDB
+    user_db: UserDB
     _login_clients_by_id: Dict[int, LoginClient]
 
     def __init__(self, user_db_path: str):
         super().__init__()
 
-        self._user_db = UserDB(user_db_path)
+        self.user_db = UserDB(user_db_path)
         self._login_clients_by_id = {}
 
         gp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

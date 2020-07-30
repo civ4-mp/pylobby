@@ -5,10 +5,13 @@ import socket
 import string
 import time
 import traceback
-from typing import Callable, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional, Union
 
 from .gs import enc2 as gs_enc2
 from .network import NetworkClient
+
+if TYPE_CHECKING:
+    from .login_server import LoginServer
 
 logger = logging.getLogger(__name__)
 
