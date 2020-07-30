@@ -95,7 +95,7 @@ class GPClient:
             self.message("\\error\\\\err\\260\\fatal\\\\errmsg\\Username doesn`t exist!\\id\\1\\final\\")
             return
 
-        if data['response'] != gsenc2.PW_Hash_to_Resp(user.password, uname, gpschal, data['challenge']):
+        if data['response'] != gsenc2.pw_hash_to_response(user.password, uname, gpschal, data['challenge']):
             self.message('\\error\\\\err\\260\\fatal\\\\errmsg\\The password provided is incorrect.\\id\\1\\final\\')
             return
 
@@ -118,7 +118,7 @@ class GPClient:
 
         # generate response
         m =  '\\lc\\2\\sesskey\\' + str(self.session)
-        m += '\\proof\\' + gsenc2.PW_Hash_to_Proof(user.password, uname, gpschal, data['challenge'])
+        m += '\\proof\\' + gsenc2.pw_hash_to_proof(user.password, uname, gpschal, data['challenge'])
         m += '\\userid\\' + str(2000000 + int(user.id))
         m += '\\profileid\\' + str(1000000 + int(user.id))
         m += '\\uniquenick\\' + uname
@@ -148,7 +148,7 @@ class GPClient:
             self.message("\\error\\\\err\\516\\fatal\\\\errmsg\\This account name is already in use!\\id\\1\\final\\")
             return
 
-        pwhash = gsenc2.gsPWDecHash(data['passwordenc'])
+        pwhash = gsenc2.pw_decode_hash(data['passwordenc'])
         user = self.server.user_db.create(data['nick'], pwhash, data['email'], '', self.host)
         self.message('\\nur\\\\userid\\{}\\profileid\\{}\\id\\1\\final\\'.format(2000000 + user.id, 1000000 + user.id))
 
@@ -242,11 +242,11 @@ class UserObj:
     def __getattr__(self, key):
         if key not in UserObj.fields:
             raise AttributeError()
-        self.db.dbcur.execute('SELECT {} FROM users WHERE id = ?'.format(key), (self.id, ))
-        return self.db.dbcur.fetchone()[0]
+        self.db.cursor.execute('SELECT {} FROM users WHERE id = ?'.format(key), (self.id,))
+        return self.db.cursor.fetchone()[0]
 
     def __setattr__(self, key, value):
-        self.db.dbcur.execute('UPDATE users SET {} = ? WHERE id = ?'.format(key), (value, self.id))
+        self.db.cursor.execute('UPDATE users SET {} = ? WHERE id = ?'.format(key), (value, self.id))
 
 
 class UserDB:
@@ -282,11 +282,11 @@ class GPServer:
         self.gps_clients = {}
 
     def remove_client(self, client, quitmsg): #cant delete clients inside their own functions?
-        del self.all_clients[client.socket]
-        if client.socket in self.GPClients:
-            del self.GPClients[client.socket]
-        if client.socket in self.gps_clients:
-            del self.gps_clients[client.socket]
+        del self.all_clients[client._socket]
+        if client._socket in self.GPClients:
+            del self.GPClients[client._socket]
+        if client._socket in self.gps_clients:
+            del self.gps_clients[client._socket]
         
     def run(self):
         self.user_db = UserDB(dbpath)
@@ -314,8 +314,8 @@ class GPServer:
         print('Waiting for clients...')
         while True:
             (rlst, wlst, xlst) = select.select(
-                [self.gp, self.gps] + [x.socket for x in self.all_clients.values()],
-                [x.socket for x in self.all_clients.values() if x.write_queue_size() > 0],
+                [self.gp, self.gps] + [x._socket for x in self.all_clients.values()],
+                [x._socket for x in self.all_clients.values() if x.write_queue_size() > 0],
                 [],
                 10)
             for x in rlst:
