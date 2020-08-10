@@ -6,11 +6,10 @@ setup(
     author="Zulan, Dingus",
     python_requires=">=3.7",
     packages=find_packages(),
-    scripts=["bin/civgs", "bin/civpb-kill"],
     entry_points="""
       [console_scripts]
-      civgs-login=pylobby:login
-      civgs-login=pylobby:gamebrowser
+      civgs-login=pylobby:login_main
+      civgs-gamebrowser=pylobby:gamebrowser_main
       """,
     install_requires=["click", "click_log", "prometheus_client"],
 )

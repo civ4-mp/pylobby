@@ -34,7 +34,7 @@ click_log.basic_config(logger)
 
 
 @click.command()
-@click.option("--user-db", type=click.Path())
+@click.option("--user-db", required=True, type=click.Path())
 @click_log.simple_verbosity_option(logger)
 def main(user_db: str):
     server = LoginServer(user_db)

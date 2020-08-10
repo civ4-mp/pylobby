@@ -53,10 +53,9 @@ class LoginBaseClient(NetworkClient["LoginServer"]):
         cooked = [(words[i], words[i + 1]) for i in range(0, len(words) - 1, 2)]
         data: Dict[str, str] = dict(cooked)
         logger.debug("Receiving command %s, data: %s", command, data)
-        data["command"] = command  # for debug purposes
         if command in self.handlers:
             try:
-                self.handlers[command](data)
+                self.handlers[command](**data)
             except Exception as ex:
                 logger.error(
                     "Error handling command: %s, data: %s, error: %s", command, data, ex
@@ -101,7 +100,7 @@ class LoginClient(LoginBaseClient):
     # example login data:
     # \login\\challenge\4jv99yxEnyNWrq6EUiBmsbUfrkgmYF4f\uniquenick\EvilLurksInternet-tk\partnerid\0\response\45f06fe0f350ae4e3cc1af9ffe258c93\firewall\1\port\0\productid\11081\gamename\civ4bts\namespaceid\17\sdkrevision\3\id\1\final\
     def handle_login(
-        self, uniquenick: str, challenge: str, response: str, **kwargs
+        self, *, uniquenick: str, challenge: str, response: str, **kwargs
     ) -> None:
         uname = uniquenick
         logger.info("Player %s attempting to login.", uname)
@@ -157,7 +156,7 @@ class LoginClient(LoginBaseClient):
     # example newuser data
     # \newuser\\email\qqq@qq\nick\borf-tk\passwordenc\J8DHxh7t\productid\11081\gamename\civ4bts\namespaceid\17\uniquenick\borf-tk\partnerid\0\id\1\final\
     def handle_newuser(
-        self, nick: str, email: str, passwordenc: str, **kwargs: str
+        self, *, nick: str, email: str, passwordenc: str, **kwargs: str
     ) -> None:
         if not (
             5 < len(nick) < 24 and 50 > len(email) > 2 and 24 > len(passwordenc) > 7
@@ -188,7 +187,7 @@ class LoginClient(LoginBaseClient):
             ]
         )
 
-    def handle_getprofile(self, profileid: str, id: str, **kwargs: str) -> None:
+    def handle_getprofile(self, *, profileid: str, id: str, **kwargs: str) -> None:
         # WARNING `id` shadowed
         pid = int(profileid)
         user = self.server.user_db[pid - 30000]
@@ -207,7 +206,7 @@ class LoginClient(LoginBaseClient):
             ]
         )
 
-    def handle_addbuddy(self, newprofileid: str, **kwargs: str) -> None:
+    def handle_addbuddy(self, *, newprofileid: str, **kwargs: str) -> None:
         npid = int(newprofileid)
         if npid == self.id:
             # doesn't let you adding yourself
@@ -215,7 +214,7 @@ class LoginClient(LoginBaseClient):
             return
         self.respond(["bm", 100, "f", npid, "msg", "|s|1|ss|chilling"])
 
-    def handle_buddymsg(self, bm: str, msg: str, t: str, **kwargs: str) -> None:
+    def handle_buddymsg(self, *, bm: str, msg: str, t: str, **kwargs: str) -> None:
         if bm != "1":
             logger.debug("Ignoring unknown bm %s", bm)
             return
@@ -237,7 +236,7 @@ class LoginClient(LoginBaseClient):
         except KeyError:
             self.error(0, "warning", "Buddy is not online.")
 
-    def handle_status(self, logout: Optional[str] = None, **kwargs: str) -> None:
+    def handle_status(self, *, logout: Optional[str] = None, **kwargs: str) -> None:
         if logout is not None:
             self.disconnect("status logout")
 
@@ -254,7 +253,7 @@ class SearchClient(LoginBaseClient):
         super().__init__(server, sock)
         self.handlers = {"search": self.handle_search, "logout": self.handle_logout}
 
-    def handle_search(self, uniquenick: str, **kwargs: str) -> None:
+    def handle_search(self, *, uniquenick: str, **kwargs: str) -> None:
         try:
             if not is_valid_nickname(uniquenick):
                 raise KeyError()

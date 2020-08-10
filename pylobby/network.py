@@ -164,7 +164,6 @@ class NetworkServer(Generic[ClientType]):
 
     def run(self) -> None:
         logging.info("Server ready, waiting for connections")
-        print("Server ready, waiting for connections.")
         last_info = time.time()
         while True:
             self.select()
