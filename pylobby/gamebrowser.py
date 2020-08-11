@@ -102,7 +102,7 @@ class SBClient(NetworkClient["SBQRServer"]):
                 if not lips:
                     lips.append("127.0.0.1")
                 flags_buffer += byteencode.ipaddr(lips[random.randrange(0, len(lips))])
-                flags_buffer += byteencode.uint16(host.data.get("localport", 6500))
+                flags_buffer += byteencode.uint16(int(host.data.get("localport", 6500)))
                 r += byteencode.uint8(flags)
                 r += flags_buffer
                 # adding fields
@@ -180,6 +180,11 @@ class SBClient(NetworkClient["SBQRServer"]):
 
 
 class SBQRServer(NetworkServer[SBClient]):
+    hosts: Dict[Address, GameHost]
+    qr_socket: socket.socket
+    sb_socket: socket.socket
+    last_aliveness_check: float
+
     def __init__(self):
         super().__init__()
         self.hosts = {}  # key = ip:port; value = other stuff
@@ -208,7 +213,7 @@ class SBQRServer(NetworkServer[SBClient]):
         logging.info("hostlist of server...")
         for index, (_, host) in enumerate(self.hosts.items()):
             logging.info(
-                "[{}] {}:{} ({}) {}".format(
+                "[{}] {}:{} ({!r}) {}".format(
                     index, host.ip, host.port, host.sessionid, host.last_activity
                 )
             )
