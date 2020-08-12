@@ -399,7 +399,7 @@ class SBQRServer(NetworkServer[SBClient]):
                 localips.append(value1)
         if len(localips) == 1:
             localip = localips[0]
-            logging.info("sb_sendpush02, single localip: %s", localip)
+            logging.debug("sb_sendpush02, single localip: %s", localip)
         elif not localips:
             logging.warning("sb_sendpush02: Missing localips, using fake")
             localip = "127.0.0.1"
@@ -419,7 +419,7 @@ class SBQRServer(NetworkServer[SBClient]):
         l = byteencode.uint16(len(msg) + 2)
         msg = l + msg
         # iterate through SBClients and make a message for each
-        logging.info(
+        logging.debug(
             "Sending info about host %s to %d clients",
             host,
             len(self._clients_by_socket),
