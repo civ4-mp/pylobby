@@ -117,7 +117,7 @@ class NetworkServer(Generic[ClientType]):
     def __init__(self, prometheus_prefix: str, prometheus_description: str):
         self._clients_by_socket = {}
         self._server_socket_handlers = {}
-        self._info_interval: int = 3 * 60
+        self._info_interval: int = 10 * 60
 
         self._metric_clients = Gauge(
             f"{prometheus_prefix}clients",
