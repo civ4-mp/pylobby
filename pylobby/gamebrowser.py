@@ -63,6 +63,10 @@ class GameHost:
     def __str__(self) -> str:
         return "{}:{}".format(self.ip, self.port)
 
+    @property
+    def game(self) -> str:
+        return self.data.get("gamename", "unknown")
+
 
 class SBClient(NetworkClient["SBQRServer"]):
     out_crypt: Optional[gs_enc.GOACryptState]
@@ -196,6 +200,11 @@ class SBQRServer(NetworkServer[SBClient]):
     sb_socket: socket.socket
     last_aliveness_check: float
 
+    _metric_games_concurrent: Gauge
+    _metric_games_concurrent_by_game: Dict[str, Gauge] = {}
+    _metric_games_total: Counter
+    _metric_games_total_by_game: Dict[str, Gauge] = {}
+
     def __init__(self):
         super().__init__("civgs_", "Civilization 4 GameSpy Lobby server")
         self.hosts = {}  # key = ip:port; value = other stuff
@@ -221,12 +230,33 @@ class SBQRServer(NetworkServer[SBClient]):
         self.last_aliveness_check = time.time()
 
         self._metric_games_concurrent = Gauge(
-            "civgs_games_concurrent", "Number of open games in the Civ4 gamebrowser"
+            "civgs_games_concurrent",
+            "Number of open games in the Civ4 gamebrowser",
+            labelnames=("game",),
         )
         self._metric_games_concurrent.set_function(lambda: len(self.hosts))
         self._metric_games_total = Counter(
-            "civgs_games_total", "Number of games created in the Civ4 gamebrowser"
+            "civgs_games_total",
+            "Number of games created in the Civ4 gamebrowser",
+            labelnames=("game",),
         )
+
+    def metric_bump_game(self, game: str) -> None:
+        if game in self._metric_games_total_by_game:
+            return
+        self._metric_games_concurrent_by_game[
+            game
+        ] = self._metric_games_concurrent.labels(game=game)
+
+        def c(g: Optional[str] = game) -> int:
+            return sum(1 if g == host.game else 0 for host in self.hosts)
+
+        self._metric_games_concurrent_by_game[game].set_function(c)
+
+        self._metric_games_total_by_game[game] = self._metric_games_total.labels(
+            game=game
+        )
+        self._metric_games_total_by_game[game].inc()
 
     def log_hostlist(self) -> None:
         logging.debug("hostlist of server...")
@@ -315,10 +345,12 @@ class SBQRServer(NetworkServer[SBClient]):
             if statechanged == 3:
                 if address in self.hosts:
                     del self.hosts[address]
-                self._metric_games_total.inc()
                 self.hosts[address] = GameHost(*address)
                 self.hosts[address].sessionid = recv_data[1:5]
                 self.hosts[address].data = parsed
+                game = self.hosts[address].game
+                self.metric_bump_game(game)
+                self._metric_games_total_by_game[game].inc()
                 resp = b"\xfe\xfd\x01" + recv_data[1:5] + gs_consts.ghchal
                 self.qr_send_to(resp, address, "03-3")
                 self.sb_sendpush02(self.hosts[address])
