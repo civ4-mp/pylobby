@@ -110,8 +110,8 @@ class NetworkServer(Generic[ClientType]):
     _info_interval: int
 
     _metric_clients: Gauge
-    _metric_clients_by_type: Dict[Type[ClientType], Gauge]
-    _metric_connections_total: Counter = {}
+    _metric_clients_by_type: Dict[Type[ClientType], Gauge] = {}
+    _metric_connections_total: Counter
     _metric_connections_total_by_type: Dict[Type[ClientType], Counter] = {}
 
     def __init__(self, prometheus_prefix: str, prometheus_description: str):
