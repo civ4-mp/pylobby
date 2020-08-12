@@ -61,7 +61,15 @@ class GameHost:
         self.last_activity = time.time()
 
     def __str__(self) -> str:
-        return "{}:{}".format(self.ip, self.port)
+        return f"{self.hostname} ({self.game}) at {self.ip}:{self.port} on {self.map}"
+
+    @property
+    def name(self) -> str:
+        return self.data.get("hostname", "unknown")
+
+    @property
+    def map(self) -> str:
+        return self.data.get("mapname", "unknown")
 
     @property
     def game(self) -> str:
@@ -241,7 +249,10 @@ class SBQRServer(NetworkServer[SBClient]):
             labelnames=("game",),
         )
 
-    def metric_bump_game(self, game: str) -> None:
+    def metric_bump(self, host: GameHost) -> None:
+        logger.info(f"new game: {host}")
+
+        game = host.game
         if game in self._metric_games_total_by_game:
             return
         self._metric_games_concurrent_by_game[
@@ -249,7 +260,7 @@ class SBQRServer(NetworkServer[SBClient]):
         ] = self._metric_games_concurrent.labels(game=game)
 
         def c(g: Optional[str] = game) -> int:
-            return sum(1 if g == host.game else 0 for host in self.hosts)
+            return sum(1 if g == h.game else 0 for h in self.hosts.values())
 
         self._metric_games_concurrent_by_game[game].set_function(c)
 
@@ -348,9 +359,7 @@ class SBQRServer(NetworkServer[SBClient]):
                 self.hosts[address] = GameHost(*address)
                 self.hosts[address].sessionid = recv_data[1:5]
                 self.hosts[address].data = parsed
-                game = self.hosts[address].game
-                self.metric_bump_game(game)
-                self._metric_games_total_by_game[game].inc()
+                self.metric_bump(self.hosts[address])
                 resp = b"\xfe\xfd\x01" + recv_data[1:5] + gs_consts.ghchal
                 self.qr_send_to(resp, address, "03-3")
                 self.sb_sendpush02(self.hosts[address])
