@@ -1,9 +1,12 @@
+import logging
 import socket
 from typing import Dict
 
 from .login_client import LoginBaseClient, LoginClient, SearchClient
 from .network import NetworkServer
 from .user_db import UserDB
+
+logger = logging.getLogger(__name__)
 
 
 class LoginServer(NetworkServer[LoginBaseClient]):
@@ -21,7 +24,7 @@ class LoginServer(NetworkServer[LoginBaseClient]):
         try:
             gp_socket.bind(("", 29900))
         except socket.error as err:
-            print("Bind failed for gp (29900 TCP): {}".format(err))
+            logger.error("Bind failed for gp (29900 TCP): {}".format(err))
             raise err
         gp_socket.listen(5)
         gp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -35,7 +38,7 @@ class LoginServer(NetworkServer[LoginBaseClient]):
         try:
             gps_socket.bind(("", 29901))
         except socket.error as err:
-            print("Bind failed for gps (29901 TCP): {}".format(err))
+            logger.error("Bind failed for gps (29901 TCP): {}".format(err))
             raise err
         gps_socket.listen(5)
         gps_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
