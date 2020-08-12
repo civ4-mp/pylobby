@@ -237,7 +237,7 @@ class SBQRServer(NetworkServer[SBClient]):
                 )
             )
             logging.debug(host.data)
-            logging.debug("... end of hostlist")
+        logging.debug("... end of hostlist")
 
     def qr_forw_to(self, rawdata: bytes) -> None:
         if rawdata[9:15] == b"\xfd\xfc\x1e\x66\x6a\xb2":
