@@ -440,7 +440,8 @@ class SBQRServer(NetworkServer[SBClient]):
             self.select()
             now = time.time()
             if self.last_aliveness_check + 10 < now:
-                for client in self._clients_by_socket.values():
+                # Need to copy here because we may be modifying the dict
+                for client in list(self._clients_by_socket.values()):
                     client.check_aliveness()
                 self.last_aliveness_check = now
 
