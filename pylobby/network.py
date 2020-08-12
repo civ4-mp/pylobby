@@ -6,7 +6,9 @@ import socket
 import time
 import traceback
 from abc import abstractmethod
-from typing import Callable, Dict, Generic, Type, TypeVar
+from typing import Callable, Dict, Generic, Optional, Type, TypeVar
+
+from prometheus_client import Counter, Gauge
 
 logger = logging.getLogger(__name__)
 
@@ -107,15 +109,34 @@ class NetworkServer(Generic[ClientType]):
     _server_socket_handlers: Dict[socket.socket, Handler]
     _info_interval: int
 
-    def __init__(self):
+    _metric_clients: Gauge
+    _metric_clients_by_type: Dict[Type[ClientType], Gauge]
+    _metric_connections_total: Counter = {}
+    _metric_connections_total_by_type: Dict[Type[ClientType], Counter] = {}
+
+    def __init__(self, prometheus_prefix: str, prometheus_description: str):
         self._clients_by_socket = {}
         self._server_socket_handlers = {}
         self._info_interval: int = 3 * 60
 
+        self._metric_clients = Gauge(
+            f"{prometheus_prefix}clients",
+            f"Number of active clients of {prometheus_description}",
+            labelnames=("client_type", "server_type"),
+        ).labels(server_type=type(self).__name__)
+        self._metric_connections_total = Counter(
+            f"{prometheus_prefix}connections_total",
+            f"Number of connections to {prometheus_description}",
+            labelnames=("client_type", "server_type"),
+        ).labels(server_type=type(self).__name__)
+
     def register_client(self, sock: socket.socket, client: ClientType) -> None:
+        assert sock not in self._clients_by_socket
         self._clients_by_socket[sock] = client
+        self._metric_connections_total_by_type[type(client)].inc()
 
     def unregister_client(self, sock: socket.socket, client: ClientType) -> None:
+        assert sock in self._clients_by_socket
         del self._clients_by_socket[sock]
 
     def register_server(
@@ -134,6 +155,24 @@ class NetworkServer(Generic[ClientType]):
             )
 
         self._server_socket_handlers[server_socket] = handler
+
+        assert client_class not in self._metric_clients_by_type
+        assert client_class not in self._metric_connections_total_by_type
+        self._metric_clients_by_type[client_class] = self._metric_clients.labels(
+            client_type=client_class.__name__
+        )
+
+        # Capture trick...
+        def c(cc: Optional[Type[ClientType]] = client_class):
+            return sum(
+                1 if cc == type(client) else 0
+                for client in self._clients_by_socket.values()
+            )
+
+        self._metric_clients_by_type[client_class].set_function(c)
+        self._metric_connections_total_by_type[
+            client_class
+        ] = self._metric_connections_total.labels(client_type=client_class.__name__)
 
     def select(self, timeout: int = 10) -> None:
         (rlst, wlst, xlst) = select.select(

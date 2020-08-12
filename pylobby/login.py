@@ -35,8 +35,22 @@ click_log.basic_config(logger)
 
 @click.command()
 @click.option("--user-db", required=True, type=click.Path())
+@click.option(
+    "--prometheus",
+    default="",
+    help="enable prometheus metrics at given address:port, set to empty to disable",
+)
 @click_log.simple_verbosity_option(logger)
-def main(user_db: str):
+def main(user_db: str, prometheus: str):
+    if prometheus:
+        try:
+            addr, port_str = prometheus.split(":")
+            port = int(port_str)
+        except ValueError:
+            addr = prometheus
+            port = 9147
+        logger.info(f"Starting prometheus server on {addr}:{port}")
+
     server = LoginServer(user_db)
     try:
         server.run()

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import click
 
 import click_log
+from prometheus_client import Counter, Gauge
 
 from . import byteencode
 from .gs import consts as gs_consts
@@ -186,7 +187,7 @@ class SBQRServer(NetworkServer[SBClient]):
     last_aliveness_check: float
 
     def __init__(self):
-        super().__init__()
+        super().__init__("civgs_", "Civilization 4 GameSpy Lobby server")
         self.hosts = {}  # key = ip:port; value = other stuff
         self.qr_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -209,16 +210,24 @@ class SBQRServer(NetworkServer[SBClient]):
 
         self.last_aliveness_check = time.time()
 
-    def print_hostlist(self) -> None:
-        logging.info("hostlist of server...")
+        self._metric_games_concurrent = Gauge(
+            "civgs_games_concurrent", "Number of open games in the Civ4 gamebrowser"
+        )
+        self._metric_games_concurrent.set_function(lambda: len(self.hosts))
+        self._metric_games_total = Counter(
+            "civgs_games_total", "Number of games created in the Civ4 gamebrowser"
+        )
+
+    def log_hostlist(self) -> None:
+        logging.debug("hostlist of server...")
         for index, (_, host) in enumerate(self.hosts.items()):
-            logging.info(
+            logging.debug(
                 "[{}] {}:{} ({!r}) {}".format(
                     index, host.ip, host.port, host.sessionid, host.last_activity
                 )
             )
-            logging.info(host.data)
-            logging.info("... end of hostlist")
+            logging.debug(host.data)
+            logging.debug("... end of hostlist")
 
     def qr_forw_to(self, rawdata: bytes) -> None:
         if rawdata[9:15] == b"\xfd\xfc\x1e\x66\x6a\xb2":
@@ -296,6 +305,7 @@ class SBQRServer(NetworkServer[SBClient]):
             if statechanged == 3:
                 if address in self.hosts:
                     del self.hosts[address]
+                self._metric_games_total.inc()
                 self.hosts[address] = GameHost(*address)
                 self.hosts[address].sessionid = recv_data[1:5]
                 self.hosts[address].data = parsed
@@ -314,6 +324,8 @@ class SBQRServer(NetworkServer[SBClient]):
             elif statechanged == 0:
                 if address in self.hosts:
                     self.hosts[address].refresh()
+
+        self.log_hostlist()
 
     def sb_sendpush02(self, host: GameHost) -> None:
         msg = b"\x02"
@@ -383,8 +395,22 @@ class SBQRServer(NetworkServer[SBClient]):
 
 
 @click.command()
+@click.option(
+    "--prometheus",
+    default="",
+    help="enable prometheus metrics at given address:port, set to empty to disable",
+)
 @click_log.simple_verbosity_option(logger)
-def main():
+def main(prometheus: str):
+    if prometheus:
+        try:
+            addr, port_str = prometheus.split(":")
+            port = int(port_str)
+        except ValueError:
+            addr = prometheus
+            port = 9148
+        logger.info(f"Starting prometheus server on {addr}:{port}")
+
     server = SBQRServer()
     try:
         server.run()

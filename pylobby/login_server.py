@@ -2,6 +2,8 @@ import logging
 import socket
 from typing import Dict
 
+from prometheus_client import Counter, Gauge
+
 from .login_client import LoginBaseClient, LoginClient, SearchClient
 from .network import NetworkServer
 from .user_db import UserDB
@@ -14,7 +16,7 @@ class LoginServer(NetworkServer[LoginBaseClient]):
     _login_clients_by_id: Dict[int, LoginClient]
 
     def __init__(self, user_db_path: str):
-        super().__init__()
+        super().__init__("civgs_", "Civilization 4 GameSpy Lobby server")
 
         self.user_db = UserDB(user_db_path)
         self._login_clients_by_id = {}
@@ -47,9 +49,14 @@ class LoginServer(NetworkServer[LoginBaseClient]):
         gps_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
         self.register_server(gps_socket, SearchClient)
 
+        self._metric_logins = Counter(
+            "civgs_logins_total", "Logins to Civ4 GameSpy Lobby"
+        )
+
     # Called after login by the client iself
     def register_gpclient(self, client: LoginClient) -> None:
         self._login_clients_by_id[client.id] = client
+        self._metric_logins.inc()
 
     # Called by base class
     def unregister_client(self, sock: socket.socket, client: LoginBaseClient) -> None:
