@@ -123,12 +123,12 @@ class NetworkServer(Generic[ClientType]):
             f"{prometheus_prefix}clients",
             f"Number of active clients of {prometheus_description}",
             labelnames=("client_type", "server_type"),
-        ).labels(server_type=type(self).__name__)
+        )
         self._metric_connections_total = Counter(
             f"{prometheus_prefix}connections_total",
             f"Number of connections to {prometheus_description}",
             labelnames=("client_type", "server_type"),
-        ).labels(server_type=type(self).__name__)
+        )
 
     def register_client(self, sock: socket.socket, client: ClientType) -> None:
         assert sock not in self._clients_by_socket
@@ -159,7 +159,7 @@ class NetworkServer(Generic[ClientType]):
         assert client_class not in self._metric_clients_by_type
         assert client_class not in self._metric_connections_total_by_type
         self._metric_clients_by_type[client_class] = self._metric_clients.labels(
-            client_type=client_class.__name__
+            client_type=client_class.__name__, server_type=type(self).__name__
         )
 
         # Capture trick...
@@ -172,7 +172,9 @@ class NetworkServer(Generic[ClientType]):
         self._metric_clients_by_type[client_class].set_function(c)
         self._metric_connections_total_by_type[
             client_class
-        ] = self._metric_connections_total.labels(client_type=client_class.__name__)
+        ] = self._metric_connections_total.labels(
+            client_type=client_class.__name__, server_type=type(self).__name__
+        )
 
     def select(self, timeout: int = 10) -> None:
         (rlst, wlst, xlst) = select.select(
