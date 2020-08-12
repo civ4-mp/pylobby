@@ -293,9 +293,9 @@ class SBQRServer(NetworkServer[SBClient]):
             )
             port = rawdata[7] * 256 + rawdata[8]
             if (ip, port) in self.hosts:
-                logging.info("forwarding to existing host")
+                logging.debug("forwarding to existing host")
             else:
-                logging.info("forwarding to unknown address")
+                logging.debug("forwarding to unknown address")
             resp = b"\xfe\xfd\x06"
             if (ip, port) in self.hosts:
                 resp += self.hosts[(ip, port)].sessionid
