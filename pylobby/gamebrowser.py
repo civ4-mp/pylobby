@@ -4,13 +4,15 @@
 import logging
 import random
 import socket
+import sys
 import time
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import click
+import pkg_resources
 
 import click_log
-from prometheus_client import Counter, Gauge
+from prometheus_client import Counter, Gauge, Info
 
 from . import byteencode
 from .gs import consts as gs_consts
@@ -20,6 +22,15 @@ from .network import NetworkClient, NetworkServer
 # Use root logger here, so other loggers inherit the configuration
 logger = logging.getLogger()
 click_log.basic_config(logger)
+
+info = Info("civgs_gamebrowser", "Civilization 4 lobby/gamebrowser version information")
+info.info(
+    {
+        # https://stackoverflow.com/a/2073599/620382
+        "version": pkg_resources.require("civ4-mp.pylobby")[0].version,
+        "python_version": sys.version,
+    }
+)
 
 
 def get_string(data: bytes, idx: int) -> bytes:
