@@ -12,7 +12,7 @@ import click
 import pkg_resources
 
 import click_log
-from prometheus_client import Counter, Gauge, Info
+from prometheus_client import Counter, Gauge, Info, start_http_server
 
 from . import byteencode
 from .gs import consts as gs_consts
@@ -28,7 +28,6 @@ info.info(
     {
         # https://stackoverflow.com/a/2073599/620382
         "version": pkg_resources.require("civ4-mp.pylobby")[0].version,
-        "python_version": sys.version,
     }
 )
 
@@ -421,6 +420,7 @@ def main(prometheus: str):
             addr = prometheus
             port = 9148
         logger.info(f"Starting prometheus server on {addr}:{port}")
+        start_http_server(port=port, addr=addr)
 
     server = SBQRServer()
     try:

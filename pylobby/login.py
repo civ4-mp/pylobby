@@ -27,7 +27,7 @@ import click
 import pkg_resources
 
 import click_log
-from prometheus_client import Info
+from prometheus_client import Info, start_http_server
 
 from .login_server import LoginServer
 
@@ -62,6 +62,7 @@ def main(user_db: str, prometheus: str):
             addr = prometheus
             port = 9147
         logger.info(f"Starting prometheus server on {addr}:{port}")
+        start_http_server(port=port, addr=addr)
 
     server = LoginServer(user_db)
     try:
