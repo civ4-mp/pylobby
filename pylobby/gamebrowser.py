@@ -61,7 +61,7 @@ class GameHost:
         self.last_activity = time.time()
 
     def __str__(self) -> str:
-        return f"{self.hostname} ({self.game}) at {self.ip}:{self.port} on {self.map}"
+        return f"{self.name} ({self.game}) at {self.ip}:{self.port} on {self.map}"
 
     @property
     def name(self) -> str:
