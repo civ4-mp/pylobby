@@ -165,12 +165,12 @@ class SBClient(NetworkClient["SBQRServer"]):
                 )
                 self.write(self.sb_00respgen(fields))
         elif packet[2] == 0x02:  # forward req
-            self.info("forward request")
+            logger.debug(f"[{self}] forward request")
             self.server.qr_forw_to(packet)
         elif packet[2] == 0x03:  # ping response
-            self.info("ping ack")
+            logger.debug(f"[{self}] ping ack")
         else:
-            self.info("SB recieved unknown command: {}".format(packet[2]))
+            logger.warning(f"[{self}] recieved unknown command: {packet[2]}")
 
     def _parse_read_buffer(self, read_buffer: bytes) -> bytes:
         self._timestamp = time.time()

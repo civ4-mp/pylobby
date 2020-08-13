@@ -31,9 +31,6 @@ class NetworkClient(Generic[ServerType]):
     def __str__(self) -> str:
         return "{}@{}:{}".format(self.__class__.__name__, self.host, self.port)
 
-    def info(self, msg: str, *args, **kwargs) -> None:
-        logging.info(str(self) + msg, *args, **kwargs)
-
     def write_queue_size(self) -> int:
         return len(self._write_buffer)
 
