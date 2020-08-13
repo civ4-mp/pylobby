@@ -251,6 +251,7 @@ class SBQRServer(NetworkServer[SBClient]):
 
         game = host.game
         if game in self._metric_games_total_by_game:
+            self._metric_games_total_by_game[game].inc()
             return
         self._metric_games_concurrent_by_game[
             game
