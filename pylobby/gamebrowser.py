@@ -206,7 +206,6 @@ class SBQRServer(NetworkServer[SBClient]):
     hosts: Dict[Address, GameHost]
     qr_socket: socket.socket
     sb_socket: socket.socket
-    last_aliveness_check: float
 
     _metric_games_concurrent: Gauge
     _metric_games_concurrent_by_game: Dict[str, Gauge] = {}
@@ -234,8 +233,6 @@ class SBQRServer(NetworkServer[SBClient]):
         except socket.error as err:
             logging.error("Bind/listen failed for sb socket (TCP 28910): %s", err)
         self.register_server(self.sb_socket, SBClient)
-
-        self.last_aliveness_check = time.time()
 
         self._metric_games_concurrent = Gauge(
             "civgs_games_concurrent",
@@ -269,16 +266,16 @@ class SBQRServer(NetworkServer[SBClient]):
         )
         self._metric_games_total_by_game[game].inc()
 
-    def log_hostlist(self) -> None:
-        logging.debug("hostlist of server...")
+    def log_hostlist(self, log=logger.debug) -> None:
+        log("hostlist of server...")
         for index, (_, host) in enumerate(self.hosts.items()):
-            logging.debug(
+            log(
                 "[{}] {}:{} ({!r}) {}".format(
                     index, host.ip, host.port, host.sessionid, host.last_activity
                 )
             )
-            logging.debug(host.data)
-        logging.debug("... end of hostlist")
+            log(host.data)
+        log("... end of hostlist")
 
     def qr_forw_to(self, rawdata: bytes) -> None:
         if rawdata[9:15] == b"\xfd\xfc\x1e\x66\x6a\xb2":
@@ -434,16 +431,23 @@ class SBQRServer(NetworkServer[SBClient]):
         for client in self._clients_by_socket.values():
             client.write(msg)
 
-    def run(self) -> None:
+    def run(self, hostlist_interval=None) -> None:
         logging.info("Server ready, waiting for connections.")
+        last_aliveness_check = time.time()
+        last_hostlist = time.time()
         while True:
             self.select()
             now = time.time()
-            if self.last_aliveness_check + 10 < now:
+            if last_aliveness_check + 10 < now:
                 # Need to copy here because we may be modifying the dict
                 for client in list(self._clients_by_socket.values()):
                     client.check_aliveness()
-                self.last_aliveness_check = now
+                last_aliveness_check = now
+            if (
+                hostlist_interval is not None
+                and last_hostlist + hostlist_interval < now
+            ):
+                self.log_hostlist(logger.info)
 
 
 @click.command()
@@ -452,8 +456,9 @@ class SBQRServer(NetworkServer[SBClient]):
     default="",
     help="enable prometheus metrics at given address:port, set to empty to disable",
 )
+@click.option("--log-hostlist-interval", default=None, type=float)
 @click_log.simple_verbosity_option(logger)
-def main(prometheus: str):
+def main(prometheus: str, log_hostlist_interval):
     if prometheus:
         try:
             addr, port_str = prometheus.split(":")
@@ -466,6 +471,6 @@ def main(prometheus: str):
 
     server = SBQRServer()
     try:
-        server.run()
+        server.run(log_hostlist_interval)
     except KeyboardInterrupt:
         logger.info("gamebrowser server stopped")
