@@ -449,6 +449,7 @@ class SBQRServer(NetworkServer[SBClient]):
                 and last_hostlist + hostlist_interval < now
             ):
                 self.log_hostlist(logger.info)
+                last_hostlist = now
 
 
 @click.command()
