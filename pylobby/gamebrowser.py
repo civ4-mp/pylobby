@@ -97,7 +97,7 @@ class SBClient(NetworkClient["SBQRServer"]):
             r += b"\x00" + field + b"\x00"
         r += b"\x00"
         # list of hosts
-        for key, host in self.server.hosts.items():
+        for key, host in list(self.server.hosts.items()):
             if (
                 host.last_activity + 360 < time.time()
             ):  # deleting old servers here so we dont need a timer for that
