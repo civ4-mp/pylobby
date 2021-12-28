@@ -9,9 +9,8 @@ import time
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import click
-import pkg_resources
-
 import click_log
+import pkg_resources
 from prometheus_client import Counter, Gauge, Info, start_http_server
 
 from . import byteencode
@@ -161,7 +160,9 @@ class SBClient(NetworkClient["SBQRServer"]):
                     query_game.decode(errors="ignore"), "Cs2iIq"
                 ).encode()
                 self.out_crypt.SBCryptStart(
-                    bytes(qfromkey), cchallenge, gs_enc.SCHALLCONST,
+                    bytes(qfromkey),
+                    cchallenge,
+                    gs_enc.SCHALLCONST,
                 )
                 self.write(self.sb_00respgen(fields))
         elif packet[2] == 0x02:  # forward req
@@ -239,7 +240,6 @@ class SBQRServer(NetworkServer[SBClient]):
             "Number of open games in the Civ4 gamebrowser",
             labelnames=("game",),
         )
-        self._metric_games_concurrent.set_function(lambda: len(self.hosts))
         self._metric_games_total = Counter(
             "civgs_games_total",
             "Number of games created in the Civ4 gamebrowser",
